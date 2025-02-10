@@ -1,0 +1,60 @@
+/* Стилізація форми додавання продукту */
+.wp-my-product-form {
+    width: 100%;
+    max-width: 600px;
+    margin: 0 auto;
+    padding: 20px;
+    background-color: #f9f9f9;
+    border-radius: 10px;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+.wp-my-product-field {
+    margin-bottom: 15px;
+}
+
+.wp-my-product-field input,
+.wp-my-product-field textarea {
+    width: 100%;
+    padding: 12px;
+    font-size: 16px;
+    border: 1px solid #ddd;
+    border-radius: 5px;
+    box-sizing: border-box;
+}
+
+.wp-my-product-field input[type="submit"] {
+    background-color: #0073aa;
+    color: white;
+    border: none;
+    cursor: pointer;
+    font-weight: bold;
+    text-transform: uppercase;
+}
+
+.wp-my-product-field input[type="submit"]:hover {
+    background-color: #005f8f;
+}
+
+.wp-my-product-field input:focus,
+.wp-my-product-field textarea:focus {
+    border-color: #0073aa;
+    outline: none;
+}
+
+.wp-my-product-field input[type="number"] {
+    -moz-appearance: textfield;
+}
+
+.wp-my-product-field input[type="number"]::-webkit-outer-spin-button,
+.wp-my-product-field input[type="number"]::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+}
+
+.wp-editor-area {
+    border: 1px solid #ddd;
+    border-radius: 5px;
+    padding: 12px;
+    font-size: 16px;
+}

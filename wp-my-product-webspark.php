@@ -43,6 +43,15 @@ class WP_My_Product_Webspark {
 		add_action( 'init', array( $this, 'add_my_account_routes' ) );
 		add_action( 'woocommerce_account_add-product_endpoint', array( $this, 'my_account_add_product' ) );
 		add_action( 'woocommerce_account_my-products_endpoint', array( $this, 'my_account_my_products' ) );
+		add_action( 'wp_enqueue_scripts', array( $this, 'enqueue_plugin_styles' ) );
+	}
+
+	/**
+	 * Enqueue plugin styles.
+	 */
+	public function enqueue_plugin_styles() {
+		// Load custom plugin styles
+		wp_enqueue_style( 'wp-my-product-webspark-styles', plugin_dir_url( __FILE__ ) . 'styles.css' );
 	}
 
 	/**
@@ -80,7 +89,71 @@ class WP_My_Product_Webspark {
 	 */
 	public function my_account_add_product() {
 		echo '<h2>' . esc_html__( 'Add product', 'wp-my-product-webspark' ) . '</h2>';
-		echo '<p>' . esc_html__( 'Here will be a form for adding a product.', 'wp-my-product-webspark' ) . '</p>';
+
+		if ( isset( $_POST['wp_my_product_add'] ) && check_admin_referer( 'wp_my_product_add_nonce', 'wp_my_product_add_nonce_field' ) ) {
+			// Get data from the form
+			if ( ! empty( $_POST['product_name'] ) && ! empty( $_POST['product_price'] ) ) { // Check only for required fields
+				$product_name        = sanitize_text_field( $_POST['product_name'] );
+				$product_price       = sanitize_text_field( $_POST['product_price'] );
+				$product_quantity    = isset( $_POST['product_quantity'] ) ? intval( $_POST['product_quantity'] ) : 0; // Quantity can be empty
+				$product_description = isset( $_POST['product_description'] ) ? wp_kses_post( $_POST['product_description'] ) : ''; // Description can be empty
+
+				// Create a new product via WooCommerce
+				$product = new WC_Product_Simple();  // For a simple product
+				$product->set_name( $product_name );
+				$product->set_regular_price( $product_price );
+				$product->set_manage_stock( true );
+				$product->set_stock_quantity( $product_quantity );  // Set quantity (optional)
+				$product->set_description( $product_description ); // Set description (optional)
+				$product->set_status( 'pending' );
+
+				// Save the product
+				$product->save();
+				echo '<p>' . esc_html__( 'Product added successfully and is awaiting review.', 'wp-my-product-webspark' ) . '</p>';
+			} else {
+				echo '<p>' . esc_html__( 'Please fill in the required fields: Product Name and Product Price.', 'wp-my-product-webspark' ) . '</p>';
+			}
+		}
+
+		// Form for adding a product
+		?>
+        <form method="POST" class="wp-my-product-form">
+			<?php wp_nonce_field( 'wp_my_product_add_nonce', 'wp_my_product_add_nonce_field' ); ?>
+
+            <div class="wp-my-product-field">
+                <input type="text" id="product_name" name="product_name"
+                       placeholder="<?php esc_html_e( 'Product Name', 'wp-my-product-webspark' ); ?>" required/>
+            </div>
+
+            <div class="wp-my-product-field">
+                <input type="number" id="product_price" name="product_price" step="0.01"
+                       placeholder="<?php esc_html_e( 'Product Price', 'wp-my-product-webspark' ); ?>" required/>
+            </div>
+
+            <div class="wp-my-product-field">
+                <input type="number" id="product_quantity" name="product_quantity" step="1" min="1"
+                       placeholder="<?php esc_html_e( 'Product Quantity', 'wp-my-product-webspark' ); ?>"/>
+            </div>
+
+            <div class="wp-my-product-field">
+				<?php
+				// Output WYSIWYG editor for product description
+				$content = isset( $_POST['product_description'] ) ? $_POST['product_description'] : '';
+				wp_editor( $content, 'product_description', array(
+					'textarea_name' => 'product_description',
+					'editor_class'  => 'wp-editor-area',
+					'textarea_rows' => 5,  // Editor height can be customized
+					'editor_height' => 200,  // Editor height can be customized
+				) );
+				?>
+            </div>
+
+            <div class="wp-my-product-field">
+                <input type="submit" name="wp_my_product_add"
+                       value="<?php esc_html_e( 'Add Product', 'wp-my-product-webspark' ); ?>"/>
+            </div>
+        </form>
+		<?php
 	}
 
 	/**
