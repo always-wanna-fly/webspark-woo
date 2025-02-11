@@ -1,0 +1,130 @@
+/* Стилізація форми додавання продукту */
+.wp-my-product-form {
+    width: 100%;
+    max-width: 600px;
+    margin: 0 auto;
+    padding: 20px;
+    background-color: #f9f9f9;
+    border-radius: 10px;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+.wp-my-product-field {
+    margin-bottom: 15px;
+}
+
+.wp-my-product-field input,
+.wp-my-product-field textarea {
+    width: 100%;
+    padding: 12px;
+    font-size: 16px;
+    border: 1px solid #ddd;
+    border-radius: 5px;
+    box-sizing: border-box;
+}
+
+.wp-my-product-field input[type="submit"] {
+    background-color: #0073aa;
+    color: white;
+    border: none;
+    cursor: pointer;
+    font-weight: bold;
+    text-transform: uppercase;
+}
+
+.wp-my-product-field input[type="submit"]:hover {
+    background-color: #005f8f;
+}
+
+.wp-my-product-field input:focus,
+.wp-my-product-field textarea:focus {
+    border-color: #0073aa;
+    outline: none;
+}
+
+.wp-my-product-field input[type="number"] {
+    -moz-appearance: textfield;
+}
+
+.wp-my-product-field input[type="number"]::-webkit-outer-spin-button,
+.wp-my-product-field input[type="number"]::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+}
+
+.wp-editor-area {
+    border: 1px solid #ddd;
+    border-radius: 5px;
+    padding: 12px;
+    font-size: 16px;
+}
+.my-products-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 20px;
+}
+.my-products-table th, .my-products-table td {
+    border: 1px solid #ddd;
+    padding: 10px;
+    text-align: left;
+}
+.my-products-table th {
+    background-color: #f4f4f4;
+    font-weight: bold;
+}
+.my-products-table tr:nth-child(even) {
+    background-color: #f9f9f9;
+}
+.my-products-table tr:hover {
+    background-color: #f1f1f1;
+}
+.button {
+    padding: 5px 10px;
+    border-radius: 4px;
+    cursor: pointer;
+    border: none;
+    color: #fff;
+    font-weight: bold;
+}
+.button.edit {
+    background-color: #0073aa; /* Колір для редагування */
+}
+.button.delete {
+    background-color: #e74c3c; /* Колір для видалення */
+}
+.button:hover {
+    opacity: 0.8;
+}
+.pagination {
+    text-align: center;
+    margin-top: 20px;
+}
+.pagination a {
+    display: inline-block;
+    margin: 0 5px;
+    padding: 8px 12px;
+    border: 1px solid #ddd;
+    background-color: #f9f9f9;
+    color: #0073aa;
+    text-decoration: none;
+    font-size: 14px;
+    border-radius: 5px;
+    transition: background-color 0.3s ease, color 0.3s ease;
+}
+.pagination a:hover {
+    background-color: #0073aa;
+    color: #fff;
+}
+.pagination .current {
+    background-color: #0073aa;
+    color: #fff;
+    cursor: not-allowed;
+}
+.pagination .disabled {
+    color: #ccc;
+    cursor: not-allowed;
+}
+.pagination a:first-child,
+.pagination a:last-child {
+    font-weight: bold;
+}
