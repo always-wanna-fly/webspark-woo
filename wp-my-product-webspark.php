@@ -44,14 +44,21 @@ class WP_My_Product_Webspark {
 		add_action( 'woocommerce_account_add-product_endpoint', array( $this, 'my_account_add_product' ) );
 		add_action( 'woocommerce_account_my-products_endpoint', array( $this, 'my_account_my_products' ) );
 		add_action( 'wp_enqueue_scripts', array( $this, 'enqueue_plugin_styles' ) );
+		add_action( 'wp_enqueue_scripts', array( $this, 'enqueue_scripts' ) );
+		add_action( 'wp_ajax_delete_product', array( $this, 'delete_product' ) );
+		add_action( 'wp_ajax_nopriv_delete_product', array( $this, 'delete_product' ) );
 	}
 
 	/**
-	 * Enqueue plugin styles.
+	 * Enqueue plugin styles and scripts
 	 */
 	public function enqueue_plugin_styles() {
 		// Load custom plugin styles
 		wp_enqueue_style( 'wp-my-product-webspark-styles', plugin_dir_url( __FILE__ ) . 'styles.css' );
+	}
+	public function enqueue_scripts() {
+		wp_enqueue_script( 'wp-my-product-webspark-js', plugin_dir_url( __FILE__ ) . 'js/ajax-delete.js', array( 'jquery' ), null, true );
+		wp_localize_script( 'wp-my-product-webspark-js', 'ajax_object', array( 'ajax_url' => admin_url( 'admin-ajax.php' ) ) );
 	}
 
 	/**
@@ -161,8 +168,95 @@ class WP_My_Product_Webspark {
 	 */
 	public function my_account_my_products() {
 		echo '<h2>' . esc_html__( 'My products', 'wp-my-product-webspark' ) . '</h2>';
-		echo '<p>' . esc_html__( 'Here will be a list of user products.', 'wp-my-product-webspark' ) . '</p>';
+
+		// Pagination
+		$current_page = isset( $_GET['paged'] ) ? intval( $_GET['paged'] ) : 1;
+		$per_page = 10; // Кількість продуктів на сторінці
+		$offset = ( $current_page - 1 ) * $per_page;
+
+		// Receive the products of the current user
+		$user_id = get_current_user_id();
+		$args = array(
+			'post_type'      => 'product',
+			'posts_per_page' => $per_page,
+			'offset'          => $offset,
+			'post_status'     => 'any', // Отримуємо всі статуси
+			'author'          => $user_id,
+		);
+
+		$products_query = new WP_Query( $args );
+
+		if ( $products_query->have_posts() ) {
+			// Display a table of products with a class for styles
+			echo '<table class="my-products-table">';
+			echo '<thead>';
+			echo '<tr>';
+			echo '<th>' . esc_html__( 'Product Name', 'wp-my-product-webspark' ) . '</th>';
+			echo '<th>' . esc_html__( 'Quantity', 'wp-my-product-webspark' ) . '</th>';
+			echo '<th>' . esc_html__( 'Price', 'wp-my-product-webspark' ) . '</th>';
+			echo '<th>' . esc_html__( 'Status', 'wp-my-product-webspark' ) . '</th>';
+			echo '<th>' . esc_html__( 'Edit', 'wp-my-product-webspark' ) . '</th>';
+			echo '<th>' . esc_html__( 'Delete', 'wp-my-product-webspark' ) . '</th>';
+			echo '</tr>';
+			echo '</thead>';
+			echo '<tbody>';
+
+			while ( $products_query->have_posts() ) {
+				$products_query->the_post();
+				$product = wc_get_product( get_the_ID() );
+				$product_name = $product->get_name();
+				$product_quantity = $product->get_stock_quantity();
+				$product_price = $product->get_price();
+				$product_status = $product->get_status();
+				$edit_url = get_edit_post_link( get_the_ID() );
+
+				echo '<tr>';
+				echo '<td>' . esc_html( $product_name ) . '</td>';
+				echo '<td>' . esc_html( $product_quantity ) . '</td>';
+				echo '<td>' . esc_html( $product_price ) . '</td>';
+				echo '<td>' . esc_html( ucfirst( $product_status ) ) . '</td>';
+				echo '<td><a class="button edit" href="' . esc_url( $edit_url ) . '">' . esc_html__( 'Edit', 'wp-my-product-webspark' ) . '</a></td>';
+				echo '<td><button class="delete-product button delete" data-id="' . get_the_ID() . '">Delete</button></td></tr>';
+				echo '</tr>';
+			}
+
+			echo '</tbody>';
+			echo '</table>';
+
+			// Pagination
+			$total_products = $products_query->found_posts;
+			$total_pages = ceil( $total_products / $per_page );
+
+			if ( $total_pages > 1 ) {
+				echo '<div class="pagination">';
+				for ( $i = 1; $i <= $total_pages; $i++ ) {
+					echo '<a href="' . add_query_arg( 'paged', $i ) . '">' . $i . '</a> ';
+				}
+				echo '</div>';
+			}
+
+			wp_reset_postdata();
+		} else {
+			echo '<p>' . esc_html__( 'You do not have any products yet.', 'wp-my-product-webspark' ) . '</p>';
+		}
 	}
+	public function delete_product() {
+		if ( isset( $_POST['product_id'] ) && is_user_logged_in() ) {
+			$product_id = intval( $_POST['product_id'] );
+			$product = get_post( $product_id );
+
+			if ( $product && $product->post_type === 'product' && get_current_user_id() === (int) $product->post_author ) {
+				wp_delete_post( $product_id, true );
+				echo 'success';
+			} else {
+				echo 'error';
+			}
+		} else {
+			echo 'error';
+		}
+		die();
+	}
+
 
 	/**
 	 * Flush rewrite rules after plugin activation.
