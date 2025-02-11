@@ -47,6 +47,7 @@ class WP_My_Product_Webspark {
 		add_action( 'wp_enqueue_scripts', array( $this, 'enqueue_scripts' ) );
 		add_action( 'wp_ajax_delete_product', array( $this, 'delete_product' ) );
 		add_action( 'wp_ajax_nopriv_delete_product', array( $this, 'delete_product' ) );
+		add_action( 'woocommerce_account_edit-product_endpoint', array( $this, 'my_account_edit_product' ) );
 	}
 
 	/**
@@ -89,6 +90,7 @@ class WP_My_Product_Webspark {
 	public function add_my_account_routes() {
 		add_rewrite_endpoint( 'add-product', EP_ROOT | EP_PAGES );
 		add_rewrite_endpoint( 'my-products', EP_ROOT | EP_PAGES );
+		add_rewrite_endpoint( 'edit-product', EP_ROOT | EP_PAGES );
 	}
 
 	/**
@@ -180,7 +182,7 @@ class WP_My_Product_Webspark {
 			'post_type'      => 'product',
 			'posts_per_page' => $per_page,
 			'offset'          => $offset,
-			'post_status'     => 'any', // Отримуємо всі статуси
+			'post_status'     => 'any',
 			'author'          => $user_id,
 		);
 
@@ -208,15 +210,14 @@ class WP_My_Product_Webspark {
 				$product_quantity = $product->get_stock_quantity();
 				$product_price = $product->get_price();
 				$product_status = $product->get_status();
-				$edit_url = get_edit_post_link( get_the_ID() );
-
+				$edit_url = add_query_arg( 'product_id', get_the_ID(), home_url( '/my-account/edit-product/' ) );
 				echo '<tr>';
 				echo '<td>' . esc_html( $product_name ) . '</td>';
 				echo '<td>' . esc_html( $product_quantity ) . '</td>';
 				echo '<td>' . esc_html( $product_price ) . '</td>';
 				echo '<td>' . esc_html( ucfirst( $product_status ) ) . '</td>';
 				echo '<td><a class="button edit" href="' . esc_url( $edit_url ) . '">' . esc_html__( 'Edit', 'wp-my-product-webspark' ) . '</a></td>';
-				echo '<td><button class="delete-product button delete" data-id="' . get_the_ID() . '">Delete</button></td></tr>';
+				echo '<td><button class="delete-product button delete" data-id="' . get_the_ID() . '">'. esc_html__( 'Delete', 'wp-my-product-webspark' ) . '</button></td></tr>';
 				echo '</tr>';
 			}
 
@@ -240,6 +241,84 @@ class WP_My_Product_Webspark {
 			echo '<p>' . esc_html__( 'You do not have any products yet.', 'wp-my-product-webspark' ) . '</p>';
 		}
 	}
+	/**
+	 * Content for the product edit tab.
+	 */
+	public function my_account_edit_product() {
+		echo '<h2>' . esc_html__( 'Edit Product', 'wp-my-product-webspark' ) . '</h2>';
+
+		if ( isset( $_GET['product_id'] ) && is_numeric( $_GET['product_id'] ) ) {
+			$product_id = intval( $_GET['product_id'] );
+			$product = wc_get_product( $product_id );
+			$product_author_id = $product->get_post_data()->post_author;
+
+			if ( $product_author_id !== get_current_user_id() ) {
+				// If the form has been sent, we process the editing
+				if ( isset( $_POST['wp_my_product_edit'] ) && check_admin_referer( 'wp_my_product_edit_nonce', 'wp_my_product_edit_nonce_field' ) ) {
+					$product_name = sanitize_text_field( $_POST['product_name'] );
+					$product_price = sanitize_text_field( $_POST['product_price'] );
+					$product_quantity = isset( $_POST['product_quantity'] ) ? intval( $_POST['product_quantity'] ) : '';
+					$product_description = isset( $_POST['product_description'] ) ? wp_kses_post( $_POST['product_description'] ) : '';
+
+					// Update product data
+					$product->set_name( $product_name );
+					$product->set_regular_price( $product_price );
+					$product->set_stock_quantity( $product_quantity );
+					$product->set_description( $product_description );
+					$product->set_status( 'pending' );
+					$product->save();
+
+					echo '<p>' . esc_html__( 'Product updated successfully.', 'wp-my-product-webspark' ) . '</p>';
+				}
+
+				?>
+                <form method="POST" class="wp-my-product-form">
+					<?php wp_nonce_field( 'wp_my_product_edit_nonce', 'wp_my_product_edit_nonce_field' ); ?>
+
+                    <div class="wp-my-product-field">
+                        <input type="text" id="product_name" name="product_name"
+                               placeholder="<?php esc_html_e( 'Product Name', 'wp-my-product-webspark' ); ?>"
+                               value="<?php echo esc_attr( $product->get_name() ); ?>" required/>
+                    </div>
+
+                    <div class="wp-my-product-field">
+                        <input type="number" id="product_price" name="product_price" step="1" min="1"
+                               placeholder="<?php esc_html_e( 'Product Price', 'wp-my-product-webspark' ); ?>"
+                               value="<?php echo esc_attr( $product->get_regular_price() ); ?>" required/>
+                    </div>
+
+                    <div class="wp-my-product-field">
+                        <input type="number" id="product_quantity" name="product_quantity" step="1" min="1"
+                               placeholder="<?php esc_html_e( 'Product Quantity', 'wp-my-product-webspark' ); ?>"
+                               value="<?php echo esc_attr( $product->get_stock_quantity() ); ?>"/>
+                    </div>
+
+                    <div class="wp-my-product-field">
+						<?php
+						$content = $product->get_description();
+						wp_editor( $content, 'product_description', array(
+							'textarea_name' => 'product_description',
+							'editor_class'  => 'wp-editor-area',
+							'textarea_rows' => 5,
+							'editor_height' => 200,
+						) );
+						?>
+                    </div>
+
+                    <div class="wp-my-product-field">
+                        <input type="submit" name="wp_my_product_edit"
+                               value="<?php esc_html_e( 'Update Product', 'wp-my-product-webspark' ); ?>"/>
+                    </div>
+                </form>
+				<?php
+			} else {
+				echo '<p>' . esc_html__( 'You do not have permission to edit this product.', 'wp-my-product-webspark' ) . '</p>';
+			}
+		} else {
+			echo '<p>' . esc_html__( 'No product found to edit.', 'wp-my-product-webspark' ) . '</p>';
+		}
+	}
+
 	public function delete_product() {
 		if ( isset( $_POST['product_id'] ) && is_user_logged_in() ) {
 			$product_id = intval( $_POST['product_id'] );
