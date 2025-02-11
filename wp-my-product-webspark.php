@@ -48,6 +48,7 @@ class WP_My_Product_Webspark {
 		add_action( 'wp_ajax_delete_product', array( $this, 'delete_product' ) );
 		add_action( 'wp_ajax_nopriv_delete_product', array( $this, 'delete_product' ) );
 		add_action( 'woocommerce_account_edit-product_endpoint', array( $this, 'my_account_edit_product' ) );
+		add_filter( 'pre_get_posts', array( $this, 'filter_media_library_by_user' ) );
 	}
 
 	/**
@@ -57,7 +58,9 @@ class WP_My_Product_Webspark {
 		// Load custom plugin styles
 		wp_enqueue_style( 'wp-my-product-webspark-styles', plugin_dir_url( __FILE__ ) . 'styles.css' );
 	}
+
 	public function enqueue_scripts() {
+		wp_enqueue_script( 'product-image-uploader', plugin_dir_url( __FILE__ ) . 'js/product-image-uploader.js', array('jquery', 'wp-mediaelement'), null, true );
 		wp_enqueue_script( 'wp-my-product-webspark-js', plugin_dir_url( __FILE__ ) . 'js/ajax-delete.js', array( 'jquery' ), null, true );
 		wp_localize_script( 'wp-my-product-webspark-js', 'ajax_object', array( 'ajax_url' => admin_url( 'admin-ajax.php' ) ) );
 	}
@@ -106,6 +109,7 @@ class WP_My_Product_Webspark {
 				$product_price       = sanitize_text_field( $_POST['product_price'] );
 				$product_quantity    = isset( $_POST['product_quantity'] ) ? intval( $_POST['product_quantity'] ) : 0; // Quantity can be empty
 				$product_description = isset( $_POST['product_description'] ) ? wp_kses_post( $_POST['product_description'] ) : ''; // Description can be empty
+				$product_image_id    = isset( $_POST['product_image_id'] ) ? intval( $_POST['product_image_id'] ) : 0; // Get the image ID
 
 				// Create a new product via WooCommerce
 				$product = new WC_Product_Simple();  // For a simple product
@@ -115,6 +119,11 @@ class WP_My_Product_Webspark {
 				$product->set_stock_quantity( $product_quantity );  // Set quantity (optional)
 				$product->set_description( $product_description ); // Set description (optional)
 				$product->set_status( 'pending' );
+
+				// Set product image if available
+				if ( $product_image_id ) {
+					$product->set_image_id( $product_image_id );  // Assign the image to the product
+				}
 
 				// Save the product
 				$product->save();
@@ -156,6 +165,17 @@ class WP_My_Product_Webspark {
 				) );
 				?>
             </div>
+            <div class="wp-my-product-field">
+                <label for="product_image"><?php esc_html_e( 'Product Image', 'wp-my-product-webspark' ); ?></label>
+                <button type="button" class="button"
+                        id="product_image_button"><?php esc_html_e( 'Choose Image', 'wp-my-product-webspark' ); ?></button>
+                <div id="product_image_preview" style="display: none;">
+                    <img src="" alt="<?php esc_html_e( 'Selected Image', 'wp-my-product-webspark' ); ?>"
+                         id="product_image_display" style="max-width: 100px; margin-top: 10px;"/>
+                    <button type="button" id="product_image_remove" style="margin-top: 5px;"><?php esc_html_e( 'Remove Image', 'wp-my-product-webspark' ); ?></button>
+                </div>
+                <input type="hidden" id="product_image_id" name="product_image_id" value=""/>
+            </div>
 
             <div class="wp-my-product-field">
                 <input type="submit" name="wp_my_product_add"
@@ -163,6 +183,19 @@ class WP_My_Product_Webspark {
             </div>
         </form>
 		<?php
+	}
+
+	function filter_media_library_by_user( $query ) {
+		if ( ! is_admin() || ! current_user_can( 'upload_files' ) ) {
+			return $query;
+		}
+
+		//Checking if we are in the media library
+		if ( isset( $query->query['post_type'] ) && $query->query['post_type'] == 'attachment' ) {
+			$query->set( 'author', get_current_user_id() );  // filter by author
+		}
+
+		return $query;
 	}
 
 	/**
@@ -173,17 +206,17 @@ class WP_My_Product_Webspark {
 
 		// Pagination
 		$current_page = isset( $_GET['paged'] ) ? intval( $_GET['paged'] ) : 1;
-		$per_page = 10; // Кількість продуктів на сторінці
-		$offset = ( $current_page - 1 ) * $per_page;
+		$per_page     = 10; // Кількість продуктів на сторінці
+		$offset       = ( $current_page - 1 ) * $per_page;
 
 		// Receive the products of the current user
 		$user_id = get_current_user_id();
-		$args = array(
+		$args    = array(
 			'post_type'      => 'product',
 			'posts_per_page' => $per_page,
-			'offset'          => $offset,
-			'post_status'     => 'any',
-			'author'          => $user_id,
+			'offset'         => $offset,
+			'post_status'    => 'any',
+			'author'         => $user_id,
 		);
 
 		$products_query = new WP_Query( $args );
@@ -205,19 +238,19 @@ class WP_My_Product_Webspark {
 
 			while ( $products_query->have_posts() ) {
 				$products_query->the_post();
-				$product = wc_get_product( get_the_ID() );
-				$product_name = $product->get_name();
+				$product          = wc_get_product( get_the_ID() );
+				$product_name     = $product->get_name();
 				$product_quantity = $product->get_stock_quantity();
-				$product_price = $product->get_price();
-				$product_status = $product->get_status();
-				$edit_url = add_query_arg( 'product_id', get_the_ID(), home_url( '/my-account/edit-product/' ) );
+				$product_price    = $product->get_price();
+				$product_status   = $product->get_status();
+				$edit_url         = add_query_arg( 'product_id', get_the_ID(), home_url( '/my-account/edit-product/' ) );
 				echo '<tr>';
 				echo '<td>' . esc_html( $product_name ) . '</td>';
 				echo '<td>' . esc_html( $product_quantity ) . '</td>';
 				echo '<td>' . esc_html( $product_price ) . '</td>';
 				echo '<td>' . esc_html( ucfirst( $product_status ) ) . '</td>';
 				echo '<td><a class="button edit" href="' . esc_url( $edit_url ) . '">' . esc_html__( 'Edit', 'wp-my-product-webspark' ) . '</a></td>';
-				echo '<td><button class="delete-product button delete" data-id="' . get_the_ID() . '">'. esc_html__( 'Delete', 'wp-my-product-webspark' ) . '</button></td></tr>';
+				echo '<td><button class="delete-product button delete" data-id="' . get_the_ID() . '">' . esc_html__( 'Delete', 'wp-my-product-webspark' ) . '</button></td></tr>';
 				echo '</tr>';
 			}
 
@@ -226,11 +259,11 @@ class WP_My_Product_Webspark {
 
 			// Pagination
 			$total_products = $products_query->found_posts;
-			$total_pages = ceil( $total_products / $per_page );
+			$total_pages    = ceil( $total_products / $per_page );
 
 			if ( $total_pages > 1 ) {
 				echo '<div class="pagination">';
-				for ( $i = 1; $i <= $total_pages; $i++ ) {
+				for ( $i = 1; $i <= $total_pages; $i ++ ) {
 					echo '<a href="' . add_query_arg( 'paged', $i ) . '">' . $i . '</a> ';
 				}
 				echo '</div>';
@@ -241,6 +274,7 @@ class WP_My_Product_Webspark {
 			echo '<p>' . esc_html__( 'You do not have any products yet.', 'wp-my-product-webspark' ) . '</p>';
 		}
 	}
+
 	/**
 	 * Content for the product edit tab.
 	 */
@@ -248,23 +282,34 @@ class WP_My_Product_Webspark {
 		echo '<h2>' . esc_html__( 'Edit Product', 'wp-my-product-webspark' ) . '</h2>';
 
 		if ( isset( $_GET['product_id'] ) && is_numeric( $_GET['product_id'] ) ) {
-			$product_id = intval( $_GET['product_id'] );
-			$product = wc_get_product( $product_id );
+			$product_id        = intval( $_GET['product_id'] );
+			$product           = wc_get_product( $product_id );
 			$product_author_id = $product->get_post_data()->post_author;
 
 			if ( $product_author_id !== get_current_user_id() ) {
 				// If the form has been sent, we process the editing
 				if ( isset( $_POST['wp_my_product_edit'] ) && check_admin_referer( 'wp_my_product_edit_nonce', 'wp_my_product_edit_nonce_field' ) ) {
-					$product_name = sanitize_text_field( $_POST['product_name'] );
-					$product_price = sanitize_text_field( $_POST['product_price'] );
-					$product_quantity = isset( $_POST['product_quantity'] ) ? intval( $_POST['product_quantity'] ) : '';
+					$product_name        = sanitize_text_field( $_POST['product_name'] );
+					$product_price       = sanitize_text_field( $_POST['product_price'] );
+					$product_quantity    = isset( $_POST['product_quantity'] ) ? intval( $_POST['product_quantity'] ) : '';
 					$product_description = isset( $_POST['product_description'] ) ? wp_kses_post( $_POST['product_description'] ) : '';
+					$product_image_id    = isset( $_POST['product_image_id'] ) ? intval( $_POST['product_image_id'] ) : 0;
+
+                    // If the image is removed, set image ID to 0
+					if ( isset( $_POST['remove_image'] ) ) {
+						$product_image_id = 0;
+					}
 
 					// Update product data
 					$product->set_name( $product_name );
 					$product->set_regular_price( $product_price );
 					$product->set_stock_quantity( $product_quantity );
 					$product->set_description( $product_description );
+					if ( $product_image_id ) {
+						$product->set_image_id( $product_image_id );
+					} else {
+						$product->set_image_id( 0 ); // Remove the image if no image ID is provided
+					}
 					$product->set_status( 'pending' );
 					$product->save();
 
@@ -304,6 +349,21 @@ class WP_My_Product_Webspark {
 						) );
 						?>
                     </div>
+                    <div class="wp-my-product-field">
+                        <label for="product_image"><?php esc_html_e( 'Product Image', 'wp-my-product-webspark' ); ?></label>
+                        <button type="button" class="button" id="product_image_button"><?php esc_html_e( 'Choose Image', 'wp-my-product-webspark' ); ?></button>
+
+                        <!-- This div will display the selected image preview if an image is selected -->
+                        <div id="product_image_preview" style="display: <?php echo $product->get_image_id() ? 'block' : 'none'; ?>;">
+                            <img src="<?php echo esc_url( wp_get_attachment_url( $product->get_image_id() ) ); ?>"
+                                 alt="<?php esc_html_e( 'Selected Image', 'wp-my-product-webspark' ); ?>"
+                                 id="product_image_display" style="max-width: 100px; margin-top: 10px;"/>
+                            <button type="button" id="product_image_remove" style="margin-top: 5px;"><?php esc_html_e( 'Remove Image', 'wp-my-product-webspark' ); ?></button>
+                        </div>
+
+                        <!-- Hidden field to store the selected image ID -->
+                        <input type="hidden" id="product_image_id" name="product_image_id" value="<?php echo esc_attr( $product->get_image_id() ); ?>"/>
+                    </div>
 
                     <div class="wp-my-product-field">
                         <input type="submit" name="wp_my_product_edit"
@@ -322,7 +382,7 @@ class WP_My_Product_Webspark {
 	public function delete_product() {
 		if ( isset( $_POST['product_id'] ) && is_user_logged_in() ) {
 			$product_id = intval( $_POST['product_id'] );
-			$product = get_post( $product_id );
+			$product    = get_post( $product_id );
 
 			if ( $product && $product->post_type === 'product' && get_current_user_id() === (int) $product->post_author ) {
 				wp_delete_post( $product_id, true );
