@@ -60,7 +60,10 @@ class WP_My_Product_Webspark {
 	}
 
 	public function enqueue_scripts() {
-		wp_enqueue_script( 'product-image-uploader', plugin_dir_url( __FILE__ ) . 'js/product-image-uploader.js', array('jquery', 'wp-mediaelement'), null, true );
+		wp_enqueue_script( 'product-image-uploader', plugin_dir_url( __FILE__ ) . 'js/product-image-uploader.js', array(
+			'jquery',
+			'wp-mediaelement'
+		), null, true );
 		wp_enqueue_script( 'wp-my-product-webspark-js', plugin_dir_url( __FILE__ ) . 'js/ajax-delete.js', array( 'jquery' ), null, true );
 		wp_localize_script( 'wp-my-product-webspark-js', 'ajax_object', array( 'ajax_url' => admin_url( 'admin-ajax.php' ) ) );
 	}
@@ -110,6 +113,7 @@ class WP_My_Product_Webspark {
 				$product_quantity    = isset( $_POST['product_quantity'] ) ? intval( $_POST['product_quantity'] ) : 0; // Quantity can be empty
 				$product_description = isset( $_POST['product_description'] ) ? wp_kses_post( $_POST['product_description'] ) : ''; // Description can be empty
 				$product_image_id    = isset( $_POST['product_image_id'] ) ? intval( $_POST['product_image_id'] ) : 0; // Get the image ID
+				$send_email          = isset( $_POST['send_email'] ) ? $_POST['send_email'] : 'no';
 
 				// Create a new product via WooCommerce
 				$product = new WC_Product_Simple();  // For a simple product
@@ -127,6 +131,30 @@ class WP_My_Product_Webspark {
 
 				// Save the product
 				$product->save();
+
+				// Get the author and admin edit page URLs
+				$author_id        = $product->get_post_data()->post_author;
+				$author_url       = get_author_posts_url( $author_id ); // Правильне посилання на публічну сторінку автора
+				$product_edit_url = admin_url( 'post.php?post=' . $product->get_id() . '&action=edit' );
+
+				$admin_email = get_option( 'admin_email' ); // Адреса адміністратора сайту
+
+				$email_subject = 'New Product Added';
+				$email_content = "
+                        Product Name: $product_name<br>
+                        Author Page: <a href=\"$author_url\">$author_url</a><br>
+                        Edit Product: <a href=\"$product_edit_url\">$product_edit_url</a><br>
+                    ";
+
+				// send later
+				if ( $send_email === 'yes' ) {
+					$result = wp_mail( $admin_email, $email_subject, $email_content );
+					if ( $result ) {
+						echo 'Email sent successfully.';
+					} else {
+						echo 'Email sending failed.';
+					}
+				}
 				echo '<p>' . esc_html__( 'Product added successfully and is awaiting review.', 'wp-my-product-webspark' ) . '</p>';
 			} else {
 				echo '<p>' . esc_html__( 'Please fill in the required fields: Product Name and Product Price.', 'wp-my-product-webspark' ) . '</p>';
@@ -172,9 +200,17 @@ class WP_My_Product_Webspark {
                 <div id="product_image_preview" style="display: none;">
                     <img src="" alt="<?php esc_html_e( 'Selected Image', 'wp-my-product-webspark' ); ?>"
                          id="product_image_display" style="max-width: 100px; margin-top: 10px;"/>
-                    <button type="button" id="product_image_remove" style="margin-top: 5px;"><?php esc_html_e( 'Remove Image', 'wp-my-product-webspark' ); ?></button>
+                    <button type="button" id="product_image_remove"
+                            style="margin-top: 5px;"><?php esc_html_e( 'Remove Image', 'wp-my-product-webspark' ); ?></button>
                 </div>
                 <input type="hidden" id="product_image_id" name="product_image_id" value=""/>
+            </div>
+            <div class="wp-my-product-field">
+                <label for="send_email"><?php esc_html_e( 'Send Email', 'wp-my-product-webspark' ); ?></label>
+                <select name="send_email" id="send_email">
+                    <option value="yes"><?php esc_html_e( 'Yes', 'wp-my-product-webspark' ); ?></option>
+                    <option value="no"><?php esc_html_e( 'No', 'wp-my-product-webspark' ); ?></option>
+                </select>
             </div>
 
             <div class="wp-my-product-field">
@@ -294,8 +330,9 @@ class WP_My_Product_Webspark {
 					$product_quantity    = isset( $_POST['product_quantity'] ) ? intval( $_POST['product_quantity'] ) : '';
 					$product_description = isset( $_POST['product_description'] ) ? wp_kses_post( $_POST['product_description'] ) : '';
 					$product_image_id    = isset( $_POST['product_image_id'] ) ? intval( $_POST['product_image_id'] ) : 0;
+					$send_email          = isset( $_POST['send_email'] ) ? $_POST['send_email'] : 'no';
 
-                    // If the image is removed, set image ID to 0
+					// If the image is removed, set image ID to 0
 					if ( isset( $_POST['remove_image'] ) ) {
 						$product_image_id = 0;
 					}
@@ -312,6 +349,30 @@ class WP_My_Product_Webspark {
 					}
 					$product->set_status( 'pending' );
 					$product->save();
+
+					// Get the author and admin edit page URLs
+					$author_id        = $product->get_post_data()->post_author;
+					$author_url       = get_author_posts_url( $author_id ); // Правильне посилання на публічну сторінку автора
+					$product_edit_url = admin_url( 'post.php?post=' . $product->get_id() . '&action=edit' );
+
+					$admin_email = get_option( 'admin_email' ); // Адреса адміністратора сайту
+
+					$email_subject = 'Request for edit product:';
+					$email_content = "
+                        Product Name: $product_name<br>
+                        Author Page: <a href=\"$author_url\">$author_url</a><br>
+                        Edit Product: <a href=\"$product_edit_url\">$product_edit_url</a><br>
+                    ";
+
+					// send later
+					if ( $send_email === 'yes' ) {
+						$result = wp_mail( $admin_email, $email_subject, $email_content );
+						if ( $result ) {
+							echo 'Email sent successfully.';
+						} else {
+							echo 'Email sending failed.';
+						}
+					}
 
 					echo '<p>' . esc_html__( 'Product updated successfully.', 'wp-my-product-webspark' ) . '</p>';
 				}
@@ -333,7 +394,7 @@ class WP_My_Product_Webspark {
                     </div>
 
                     <div class="wp-my-product-field">
-                        <input type="number" id="product_quantity" name="product_quantity" step="1" min="1"
+                        <input type="number" id="product_quantity" name="product_quantity" step="1"
                                placeholder="<?php esc_html_e( 'Product Quantity', 'wp-my-product-webspark' ); ?>"
                                value="<?php echo esc_attr( $product->get_stock_quantity() ); ?>"/>
                     </div>
@@ -351,18 +412,29 @@ class WP_My_Product_Webspark {
                     </div>
                     <div class="wp-my-product-field">
                         <label for="product_image"><?php esc_html_e( 'Product Image', 'wp-my-product-webspark' ); ?></label>
-                        <button type="button" class="button" id="product_image_button"><?php esc_html_e( 'Choose Image', 'wp-my-product-webspark' ); ?></button>
+                        <button type="button" class="button"
+                                id="product_image_button"><?php esc_html_e( 'Choose Image', 'wp-my-product-webspark' ); ?></button>
 
                         <!-- This div will display the selected image preview if an image is selected -->
-                        <div id="product_image_preview" style="display: <?php echo $product->get_image_id() ? 'block' : 'none'; ?>;">
+                        <div id="product_image_preview"
+                             style="display: <?php echo $product->get_image_id() ? 'block' : 'none'; ?>;">
                             <img src="<?php echo esc_url( wp_get_attachment_url( $product->get_image_id() ) ); ?>"
                                  alt="<?php esc_html_e( 'Selected Image', 'wp-my-product-webspark' ); ?>"
                                  id="product_image_display" style="max-width: 100px; margin-top: 10px;"/>
-                            <button type="button" id="product_image_remove" style="margin-top: 5px;"><?php esc_html_e( 'Remove Image', 'wp-my-product-webspark' ); ?></button>
+                            <button type="button" id="product_image_remove"
+                                    style="margin-top: 5px;"><?php esc_html_e( 'Remove Image', 'wp-my-product-webspark' ); ?></button>
                         </div>
 
                         <!-- Hidden field to store the selected image ID -->
-                        <input type="hidden" id="product_image_id" name="product_image_id" value="<?php echo esc_attr( $product->get_image_id() ); ?>"/>
+                        <input type="hidden" id="product_image_id" name="product_image_id"
+                               value="<?php echo esc_attr( $product->get_image_id() ); ?>"/>
+                    </div>
+                    <div class="wp-my-product-field">
+                        <label for="send_email"><?php esc_html_e( 'Send Email', 'wp-my-product-webspark' ); ?></label>
+                        <select name="send_email" id="send_email">
+                            <option value="yes"><?php esc_html_e( 'Yes', 'wp-my-product-webspark' ); ?></option>
+                            <option value="no"><?php esc_html_e( 'No', 'wp-my-product-webspark' ); ?></option>
+                        </select>
                     </div>
 
                     <div class="wp-my-product-field">
